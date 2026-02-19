@@ -1,4 +1,4 @@
-## Automated Competitor and Keyword Research Tool
+## Automated Competitor & Keyword Research Tool
 
 An automated SEO tool that analyzes a website's keyword gaps by comparing it against top organic competitors and generates a comprehensive markdown report delivered via email.
 
