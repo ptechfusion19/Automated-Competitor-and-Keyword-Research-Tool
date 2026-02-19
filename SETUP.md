@@ -191,9 +191,9 @@ const MAX_RANK = 20; // Change this value
 
 ### Keyword Limits
 
-- **Target Site Keywords**: 200 keywords fetched
+- **Target Site Keywords**: 100 keywords fetched
 - **Competitors Identified**: Top 10 competitors
-- **Keywords per Competitor**: Up to 1000 keywords
+- **Keywords per Competitor**: Up to 100 keywords
 
 ## Troubleshooting
 
