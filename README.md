@@ -21,7 +21,7 @@ The tool accepts the following inputs via web interface or API:
 ### Workflow
 
 1. **Target Site Analysis**
-   - Fetches up to 200 keywords for the target website
+   - Fetches up to 100 keywords for the target website
    - Extracts top 50 keywords by search volume for competitor discovery
 
 2. **Competitor Identification**
@@ -29,7 +29,7 @@ The tool accepts the following inputs via web interface or API:
    - Selects top 10 competitors based on SERP overlap
 
 3. **Competitor Keyword Collection**
-   - Fetches up to 1000 keywords per competitor
+   - Fetches up to 100 keywords per competitor
    - Aggregates and deduplicates competitor keywords
 
 4. **Gap Analysis**
@@ -58,9 +58,6 @@ The generated report includes:
   - Keyword text
   - Search volume
   - Keyword difficulty (KD)
-  - CPC (when available)
-  - Average rank (when available)
-  - Search intent
   - Estimated traffic potential
 - **Next Steps** - Prioritized SEO recommendations
 
