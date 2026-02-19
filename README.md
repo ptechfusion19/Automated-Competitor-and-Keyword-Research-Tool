@@ -20,6 +20,8 @@ The tool accepts the following inputs via web interface or API:
 
 ### Workflow
 
+![Workflow Diagram](Workflow%20Image.PNG)
+
 1. **Target Site Analysis**
    - Fetches up to 100 keywords for the target website
    - Extracts top 50 keywords by search volume for competitor discovery
