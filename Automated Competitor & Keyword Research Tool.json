@@ -1,0 +1,1017 @@
+{
+  "name": "Automated Competitor & Keyword Research Tool",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.dataforseo.com/v3/dataforseo_labs/google/ranked_keywords/live",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=[\n  {\n    \"target\": \"{{ $json.domain }}\",\n    \"location_code\": {{ $json.location_code || 2826 }},\n    \"language_code\": \"{{ $json.language_code || 'en' }}\",\n    \"filters\": [\"ranked_serp_element.serp_item.rank_group\", \"<=\", 50],\n    \"order_by\": [\"keyword_data.keyword_info.search_volume,desc\"],\n    \"limit\": 200\n  }\n]",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        5728,
+        2832
+      ],
+      "id": "aab44948-f2cc-42f3-bf61-36b544f889d3",
+      "name": "Get Ranked Keywords",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "861cV9KnepswAcIx",
+          "name": "DataForSeo"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.dataforseo.com/v3/dataforseo_labs/google/serp_competitors/live",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ [{\n  keywords: $json.top_keywords || [],\n  location_code: parseInt($json.location_code) || 2840,\n  language_code: $json.language_code || 'en',\n  item_types: ['organic'],\n  limit: 15,\n  filters: [\n    ['median_position', '<=', 20]\n  ],\n  order_by: ['rating,desc']\n}] }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        6416,
+        3408
+      ],
+      "id": "4d34de9c-3ee6-4529-b757-5d2fd3982129",
+      "name": "Get Competitors",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "861cV9KnepswAcIx",
+          "name": "DataForSeo"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.dataforseo.com/v3/dataforseo_labs/google/ranked_keywords/live",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ [{\n  target: $json.competitor_domain.replace(/^https?:\\/\\//, '').replace(/^www\\./, '').split('/')[0],\n  location_code: parseInt($json.location_code) || 2826,\n  language_code: $json.language_code || 'en',\n  filters: ['ranked_serp_element.serp_item.rank_group', '<=', 20],\n  order_by: ['keyword_data.keyword_info.search_volume,desc'],\n  limit: 200\n}] }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        7072,
+        3376
+      ],
+      "id": "799ecaba-4a26-4fb8-b132-f9c488234197",
+      "name": "Get Keywords for Each Competitor",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "861cV9KnepswAcIx",
+          "name": "DataForSeo"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "Automated-Competitor-Keyword-Research-Tool",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        4608,
+        2832
+      ],
+      "id": "1f2a76e0-179a-4dc9-90b8-095ea52f6182",
+      "name": "Webhook",
+      "webhookId": "d1f314d2-fcfe-4827-80c9-ffe30e57728b"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\n// Location and language code mappings\nconst locationMap = {\n  'United States': 2840,\n  'United Kingdom': 2826,\n  'Canada': 2124,\n  'Australia': 2036,\n  'Germany': 2276,\n  'France': 2250,\n  'Spain': 2724,\n  'Italy': 2380,\n  'Netherlands': 2528,\n  'India': 2356,\n};\n\nconst languageMap = {\n  'English': 'en',\n  'Spanish': 'es',\n  'French': 'fr',\n  'German': 'de',\n  'Italian': 'it',\n  'Portuguese': 'pt',\n  'Dutch': 'nl',\n  'Russian': 'ru',\n  'Chinese': 'zh',\n  'Japanese': 'ja',\n};\n\nreturn items.map(item => {\n  const body = item.json.body || {};\n\n  const {\n    target_url,\n    email,\n    location_name,\n    language_name,\n    location_code,\n    language_code,\n  } = body;\n\n  let raw = (target_url || '').trim();\n  let domain = '';\n\n  try {\n    const normalized = /^https?:\\/\\//i.test(raw) ? raw : `http://${raw}`;\n    const u = new URL(normalized);\n    domain = u.hostname;\n  } catch (e) {\n    domain = raw\n      .replace(/^https?:\\/\\//i, '')\n      .replace(/^www\\./i, '')\n      .split('/')[0]\n      .split('?')[0]\n      .trim();\n  }\n\n  const locName = location_name || 'United States';\n  const langName = language_name || 'English';\n\n  return {\n    json: {\n      target_url,\n      email,\n      domain,\n      location_name: locName,\n      language_name: langName,\n      location_code: location_code || locationMap[locName] || 2840,\n      language_code: language_code || languageMap[langName] || 'en',\n    },\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4848,
+        2832
+      ],
+      "id": "9045f490-948a-4543-92b0-83907543acb9",
+      "name": "Read Input"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// Pick Top 5–10 Competitors (WITH EXTENSIVE DEBUG LOGGING)\n// ============================================================\n\nconsole.log('\\n🔍 === PICK TOP COMPETITORS NODE DEBUG ===\\n');\n\nconst res = $input.first().json;\nconsole.log('1. Input received, status_code:', res.status_code);\n\nconst result = res.tasks && res.tasks[0] && res.tasks[0].result && res.tasks[0].result[0];\nconst allCompetitors = (result && result.items ? result.items : []);\n\nconsole.log('2. Total competitors in input:', allCompetitors.length);\nconsole.log('3. API Path:', res.tasks && res.tasks[0] && res.tasks[0].path ? res.tasks[0].path.join('/') : 'UNKNOWN');\n\nif (allCompetitors.length > 0) {\n  console.log('4. First 3 competitors from input:');\n  allCompetitors.slice(0, 3).forEach((c, i) => {\n    console.log(`   ${i + 1}. ${c.domain || c.keyword || c.target || 'NO IDENTIFIER'} (has domain: ${!!c.domain})`);\n  });\n}\n\n// Get the target domain so we can EXCLUDE it from competitors\nconst readInputData = $('Read Input').all();\nconst firstItem = readInputData[0] && readInputData[0].json ? readInputData[0].json : {};\nconst targetDomain = (firstItem.domain || '').toLowerCase().replace(/^www\\./, '');\n\nconsole.log('5. Target domain to exclude:', targetDomain || 'NONE');\n\n// BLACKLIST: Directory/listing/social/irrelevant sites\nconst blacklist = [\n  'wikipedia.org', 'en.wikipedia.org',\n  'facebook.com', 'www.facebook.com',\n  'twitter.com', 'x.com',\n  'instagram.com', 'linkedin.com',\n  'youtube.com', 'youtu.be',\n  'pinterest.com', 'reddit.com', 'www.reddit.com',\n  'yell.com', 'www.yell.com', 'yell.co.uk', 'www.yell.co.uk',\n  'thompsonlocal.com', 'thomsonlocal.com', 'touchlocal.com',\n  'freeindex.co.uk', '192.com', 'cylex-uk.co.uk',\n  'hotfrog.co.uk', 'brownbook.net', 'cityvisitor.co.uk',\n  'find-and-update.company-information.service.gov.uk',\n  'companieshouse.gov.uk', 'www.companieshouse.gov.uk',\n  'mapquest.com', 'google.com', 'www.google.com', 'maps.google.com',\n  'yelp.com', 'www.yelp.com',\n  'trustpilot.com', 'www.trustpilot.com'\n];\n\nfunction normalizeDomain(d) {\n  if (!d) return '';\n  return String(d).toLowerCase().replace(/^www\\./, '');\n}\n\nfunction isBlacklistedDomain(domain) {\n  if (!domain) return false;\n  const d = normalizeDomain(domain);\n  return blacklist.some(b => d === normalizeDomain(b) || d.endsWith('.' + normalizeDomain(b)));\n}\n\nfunction isTargetDomain(domain) {\n  if (!domain || !targetDomain) return false;\n  const d = normalizeDomain(domain);\n  return d === targetDomain || d.endsWith('.' + targetDomain) || targetDomain.endsWith('.' + d);\n}\n\n// Filter: remove blacklisted AND target domain\nconsole.log('\\n6. Starting filtering process...');\nconst filteredCompetitors = allCompetitors.filter((c, index) => {\n  const d = c.domain || c.target || c.keyword || '';\n  \n  if (!d) {\n    console.log(`   [${index}] REJECTED: No domain identifier found`);\n    return false;\n  }\n  \n  const isBlacklisted = isBlacklistedDomain(d);\n  const isTarget = isTargetDomain(d);\n  \n  if (isBlacklisted) {\n    console.log(`   [${index}] REJECTED (blacklisted): ${d}`);\n    return false;\n  }\n  \n  if (isTarget) {\n    console.log(`   [${index}] REJECTED (target domain): ${d}`);\n    return false;\n  }\n  \n  console.log(`   [${index}] ✅ ACCEPTED: ${d}`);\n  return true;\n});\n\nconsole.log('7. After filtering:', filteredCompetitors.length, 'competitors remain');\n\nif (filteredCompetitors.length === 0) {\n  console.log('\\n❌ ERROR: No competitors remain after filtering!');\n  console.log('Possible causes:');\n  console.log('  - Wrong API endpoint (keywords_for_site instead of competitors_domain)');\n  console.log('  - All competitors were filtered out');\n  console.log('  - Input data structure is wrong');\n  \n  return [{\n    json: {\n      error: true,\n      message: 'No competitors found after filtering. Check if you are using competitors_domain API endpoint.',\n      target_domain: targetDomain,\n      total_found: allCompetitors.length,\n      after_filtering: 0,\n      api_path: res.tasks && res.tasks[0] && res.tasks[0].path ? res.tasks[0].path.join('/') : 'unknown'\n    }\n  }];\n}\n\n// Sort by relevance\nconst sortedCompetitors = filteredCompetitors.sort((a, b) => {\n  const intersectionsDiff = (b.intersections || 0) - (a.intersections || 0);\n  if (intersectionsDiff !== 0) return intersectionsDiff;\n  \n  const keywordsDiff = (b.keywords_count || 0) - (a.keywords_count || 0);\n  if (keywordsDiff !== 0) return keywordsDiff;\n  \n  const visibilityDiff = (b.visibility || 0) - (a.visibility || 0);\n  if (visibilityDiff !== 0) return visibilityDiff;\n  \n  const rankDiff = (a.domain_rank || 999999) - (b.domain_rank || 999999);\n  return rankDiff;\n});\n\n// Take top 10\nconst competitorCount = Math.min(10, sortedCompetitors.length);\nconst competitors = sortedCompetitors.slice(0, competitorCount);\n\nconsole.log('8. Final selected competitors:', competitorCount);\ncompetitors.forEach((c, i) => {\n  console.log(`   ${i + 1}. ${c.domain} (intersections: ${c.intersections}, keywords: ${c.keywords_count})`);\n});\n\n// Return competitors\nconst output = competitors.map(c => ({\n  json: {\n    competitor_domain: c.domain || c.target,\n    competitor_metrics: {\n      avg_position: c.avg_position,\n      intersections: c.intersections,\n      keywords_count: c.keywords_count,\n      visibility: c.visibility,\n      rating: c.rating,\n      domain_rank: c.domain_rank,\n      etv: c.etv,\n      estimated_paid_traffic_cost: c.estimated_paid_traffic_cost\n    },\n    location_name: firstItem.location_name || 'United States',\n    language_name: firstItem.language_name || 'English',\n    location_code: firstItem.location_code || 2840,\n    language_code: firstItem.language_code || 'en',\n    target_domain: targetDomain,\n  },\n}));\n\nconsole.log('\\n✅ Returning', output.length, 'competitors to next node\\n');\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6896,
+        3376
+      ],
+      "id": "5f223f15-688c-408d-ab6b-be16c805b58b",
+      "name": "Pick Top 5–10 Competitors",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "jsCode": "console.log('\\n🔍 === EXTRACT COMPETITOR KEYWORDS NODE ===\\n');\n\n// ✅ FIX: Get ALL inputs, not just the first one\nconst allInputs = $input.all();\nconsole.log(`Processing ${allInputs.length} competitor API responses...`);\n\nconst outputKeywords = [];\n\nfor (const inputItem of allInputs) {\n  const res = inputItem.json;\n\n  // Check for API errors\n  if (res.status_code && res.status_code !== 20000) {\n    console.log('❌ API Error:', res.status_code, res.status_message);\n    continue; // Skip this competitor, move to next\n  }\n\n  const result = res.tasks?.[0]?.result?.[0];\n  const requestData = res.tasks?.[0]?.data || {};\n  let competitorDomain = requestData.target || result?.target || 'unknown';\n\n  if (competitorDomain !== 'unknown') {\n    competitorDomain = competitorDomain\n      .replace(/^https?:\\/\\//, '')\n      .replace(/^www\\./, '')\n      .split('/')[0];\n  }\n\n  if (!result || !result.items) {\n    console.log('❌ No keywords found for competitor:', competitorDomain);\n    continue;\n  }\n\n  const allKeywords = result.items || [];\n  console.log(`✅ ${competitorDomain}: ${allKeywords.length} keywords`);\n\n  let targetWebsiteInfo = {};\n  try {\n    targetWebsiteInfo = $('Extract Homepage Content').first().json || {};\n  } catch (e) {\n    console.log('Warning: Could not get target website info');\n  }\n\n  for (const kw of allKeywords) {\n    const kd = kw.keyword_data || {};\n    const keywordText = (kd.keyword || '').toLowerCase().trim();\n    if (!keywordText) continue;\n\n    const ki = kd.keyword_info || {};\n    const kp = kd.keyword_properties || {};\n    const ab = kd.avg_backlinks_info || {};\n    const si = kd.search_intent_info || {};\n\n    outputKeywords.push({\n      json: {\n        keyword: kd.keyword || '',\n        search_volume: ki.search_volume || 0,\n        competition: ki.competition ?? null,\n        competition_level: ki.competition_level || 'UNKNOWN',\n        cpc: ki.cpc ?? null,\n        keyword_difficulty: kp.keyword_difficulty ?? null,\n        avg_backlinks: ab.backlinks || 0,\n        avg_rank: ab.rank || null,\n        search_intent: si.main_intent || 'unknown',\n        competitor_domain: competitorDomain,\n        source: 'competitor',\n        target_business_type: targetWebsiteInfo.business_type || '',\n        target_services_offered: targetWebsiteInfo.services_offered || '',\n        target_business_description: targetWebsiteInfo.business_description || '',\n      },\n    });\n  }\n}\n\nconsole.log(`\\n✅ Total keywords returned across all competitors: ${outputKeywords.length}`);\nreturn outputKeywords;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7504,
+        3360
+      ],
+      "id": "1c456f97-1f47-4c9d-98f1-e1fb6fa87089",
+      "name": "Extract Competitor Keywords"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// Extract Target Site Keywords from DataForSEO Response\n// Fixes: outer array unwrap, correct keyword_data nesting,\n//        no optional chaining (?.), safe node references\n// Compatible with n8n v1.x (vm2 sandbox)\n// ============================================================\n\nvar results = [];\n\ntry {\n\n  // ── STEP 1: Get raw input and unwrap outer array ────────────\n  // DataForSEO returns [{...}] — an array wrapping the response\n  // n8n may pass it as array OR as object depending on HTTP node\n  var rawInput = $input.first().json;\n  var res = Array.isArray(rawInput) ? rawInput[0] : rawInput;\n\n  if (!res) {\n    return [{ json: { error: 'No input data found' } }];\n  }\n\n  // ── STEP 2: Navigate to items array ────────────────────────\n  // Path: res.tasks[0].result[0].items\n  var tasks = res.tasks;\n  if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {\n    return [{ json: { error: 'No tasks found in response' } }];\n  }\n\n  var task = tasks[0];\n  if (!task || task.status_code !== 20000) {\n    return [{ json: { error: 'Task failed with status: ' + (task ? task.status_code : 'unknown') } }];\n  }\n\n  var taskResult = task.result;\n  if (!taskResult || !Array.isArray(taskResult) || taskResult.length === 0) {\n    return [{ json: { error: 'No result found in task' } }];\n  }\n\n  var resultBlock = taskResult[0];\n  var keywords = (resultBlock && resultBlock.items) ? resultBlock.items : [];\n\n  if (keywords.length === 0) {\n    return [{ json: { error: 'No keyword items found in result' } }];\n  }\n\n  // ── STEP 3: Get target domain from API response ─────────────\n  // Use the domain from the API result itself — most reliable\n  var targetDomain = (resultBlock && resultBlock.target) ? resultBlock.target : 'unknown';\n\n  // ── STEP 4: Get homepage/business info from upstream node ───\n  // Update 'Extract Homepage Content' to match YOUR node name exactly\n  var targetWebsiteInfo = {};\n  try {\n    var homepageNode = $('Extract Homepage Content').first();\n    if (homepageNode && homepageNode.json) {\n      targetWebsiteInfo = homepageNode.json;\n    }\n  } catch (nodeError) {\n    // Node name not found or no data — continue with empty info\n    targetWebsiteInfo = {};\n  }\n\n  // ── STEP 5: Loop and extract keyword data ──────────────────\n  // CRITICAL: All keyword fields live inside kw.keyword_data\n  // NOT directly on kw — this was the main bug in the original code\n\n  for (var i = 0; i < keywords.length; i++) {\n    var kw = keywords[i];\n\n    // keyword_data contains all keyword metrics\n    var kd = kw.keyword_data || {};\n\n    // Nested objects inside keyword_data\n    var ki = kd.keyword_info || {};                // search_volume, cpc, competition\n    var kp = kd.keyword_properties || {};          // keyword_difficulty\n    var ab = kd.avg_backlinks_info || {};          // backlinks, rank\n    var si = kd.search_intent_info || {};          // main_intent\n    var serpInfo = kd.serp_info || {};             // serp features\n    var rse = kw.ranked_serp_element || {};        // ranking position\n    var serpItem = rse.serp_item || {};            // url, title, rank_absolute\n\n    // Skip items with no keyword\n    var keywordText = kd.keyword || '';\n    if (!keywordText || keywordText.trim() === '') {\n      continue;\n    }\n\n    results.push({\n      json: {\n        // ── Core keyword ──────────────────────────────────────\n        keyword:              keywordText,\n        search_volume:        ki.search_volume || 0,\n        competition:          ki.competition !== undefined ? ki.competition : 0,\n        competition_level:    ki.competition_level || 'UNKNOWN',\n        cpc:                  ki.cpc !== undefined ? ki.cpc : 0,\n        keyword_difficulty:   kp.keyword_difficulty !== undefined ? kp.keyword_difficulty : (rse.keyword_difficulty || 0),\n        avg_backlinks:        ab.backlinks || 0,\n        avg_rank:             ab.rank || null,\n        search_intent:        si.main_intent || 'unknown',\n\n        // ── Domain & source ───────────────────────────────────\n        target_domain:        targetDomain,\n        source:               'target',\n\n        // ── Ranking info ──────────────────────────────────────\n        rank_absolute:        serpItem.rank_absolute || null,\n        ranking_url:          serpItem.url || '',\n        ranking_title:        serpItem.title || '',\n        serp_item_type:       serpItem.type || 'organic',\n\n        // ── Homepage / business info for LLM filtering ────────\n        // These come from your 'Extract Homepage Content' node\n        business_type:             targetWebsiteInfo.business_type || '',\n        services_offered:          targetWebsiteInfo.services_offered || '',\n        business_description:      targetWebsiteInfo.business_description || '',\n        homepage_title:            targetWebsiteInfo.homepage_title || '',\n        homepage_h1:               targetWebsiteInfo.homepage_h1 || '',\n        homepage_meta_description: targetWebsiteInfo.homepage_meta_description || '',\n        homepage_key_paragraphs:   targetWebsiteInfo.homepage_key_paragraphs || '',\n        homepage_services_list:    targetWebsiteInfo.homepage_services_list || '',\n      }\n    });\n  }\n\n} catch (e) {\n  return [{ json: { error: 'Unexpected error: ' + e.message } }];\n}\n\n// ── STEP 6: Return results ──────────────────────────────────\nif (results.length === 0) {\n  return [{ json: { error: 'Parsing completed but no valid keywords were extracted' } }];\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6784,
+        2816
+      ],
+      "id": "0889947c-7dc9-4e71-b522-83b991930222",
+      "name": "Extract Target Keywords"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract top keywords from target site to use for competitor search\nconst res = $input.first().json;\nconst result = res.tasks && res.tasks[0] && res.tasks[0].result && res.tasks[0].result[0];\nconst keywords = (result && result.items ? result.items : []);\n\n// Get original input data\nconst originalInput = $('Extract Homepage Content').first().json || {};\n\n// 1) Optional seed keywords provided by the user (highest priority)\nlet seedKeywordsRaw = originalInput.seed_keywords || originalInput.seedKeywords || '';\nlet seedKeywords = [];\n\nif (typeof seedKeywordsRaw === 'string' && seedKeywordsRaw.trim() !== '') {\n  seedKeywords = seedKeywordsRaw\n    .split(/[\\n,]/)\n    .map(k => k.trim())\n    .filter(k => k.length > 0);\n}\n\n// 2) Top keywords from API (fallback / supplement)\n// ✅ FIX: Access keyword_data.keyword, not kw.keyword\nconst apiTopKeywords = keywords\n  .filter(kw => {\n    // ✅ FIXED: Check keyword_data.keyword\n    const keyword = kw.keyword_data && kw.keyword_data.keyword;\n    return keyword && typeof keyword === 'string' && keyword.trim() !== '';\n  })\n  .sort((a, b) => {\n    // ✅ FIXED: Access keyword_data.keyword_info.search_volume\n    const volA = (a.keyword_data && a.keyword_data.keyword_info && a.keyword_data.keyword_info.search_volume) || 0;\n    const volB = (b.keyword_data && b.keyword_data.keyword_info && b.keyword_data.keyword_info.search_volume) || 0;\n    \n    if (volA > 0 && volB > 0) return volB - volA;\n    if (volA > 0) return -1;\n    if (volB > 0) return 1;\n    return 0;\n  })\n  .slice(0, 50)\n  .map(kw => kw.keyword_data.keyword);  // ✅ FIXED: Extract keyword_data.keyword\n\n// Merge seed + API keywords, seeds first, remove duplicates (case-insensitive)\nconst seen = new Set();\nconst mergedKeywords = [];\n\n[...seedKeywords, ...apiTopKeywords].forEach(k => {\n  const key = k.toLowerCase();\n  if (!seen.has(key)) {\n    seen.add(key);\n    mergedKeywords.push(k);\n  }\n});\n\n// 3) Fallback to domain-based keywords if still nothing\nlet keywordsToUse = mergedKeywords;\nif (keywordsToUse.length === 0) {\n  const domain = originalInput.domain || '';\n  const domainParts = domain.replace(/^www\\./, '').split('.');\n  const mainDomain = domainParts[0] || '';\n  keywordsToUse = [mainDomain, domain].filter(k => k);\n}\n\n// Return with all original input data plus top_keywords\nreturn [{\n  json: {\n    target_url: originalInput.target_url || '',\n    email: originalInput.email || '',\n    domain: originalInput.domain || '',\n    location_name: originalInput.location_name || 'United States',\n    language_name: originalInput.language_name || 'English',\n    location_code: originalInput.location_code || 2840,\n    language_code: originalInput.language_code || 'en',\n    top_keywords: keywordsToUse\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6224,
+        3408
+      ],
+      "id": "e1f9f0e6-d981-4bbf-b7e7-775c1d67551e",
+      "name": "Extract Top Keywords for Competitors"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// Gap Analysis: Find keywords competitors have but target doesn't\n// FIXED VERSION - Correct detection of competitor vs target items\n// ============================================================\n\nconsole.log('\\n🔍 === GAP ANALYSIS NODE ===\\n');\n\n// All items from both branches (merged)\nconst allItems = $input.all();\n\nconsole.log('1. Total items received:', allItems.length);\n\n// Validate input - ensure we have items with json\nif (!allItems || allItems.length === 0) {\n  console.log('❌ No items received');\n  return [];\n}\n\n// ✅ Split into target vs competitor\n// Target items: have source === 'target' and keyword field\n// Competitor items: have source === 'competitor' and keyword field\nconst targetItems = allItems\n  .filter(item => item && item.json && item.json.source === 'target' && item.json.keyword)\n  .map(item => item.json);\n  \nconst competitorItems = allItems\n  .filter(item => item && item.json && item.json.source === 'competitor' && item.json.keyword)\n  .map(item => item.json);\n\nconsole.log('2. Target keywords:', targetItems.length);\nconsole.log('3. Competitor keywords:', competitorItems.length);\n\n// Debug: Show sample items\nif (targetItems.length > 0) {\n  console.log('   Sample target keyword:', targetItems[0].keyword);\n}\nif (competitorItems.length > 0) {\n  console.log('   Sample competitor keyword:', competitorItems[0].keyword, 'from', competitorItems[0].competitor_domain);\n}\n\n// Early return if no target items or no competitor items\nif (!targetItems || targetItems.length === 0) {\n  console.log('❌ No target keywords to compare against');\n  return [];\n}\n\nif (!competitorItems || competitorItems.length === 0) {\n  console.log('❌ No competitor keywords to analyze');\n  return [];\n}\n\n// Group competitor items by domain for debugging\nconst competitorsByDomain = {};\ncompetitorItems.forEach(item => {\n  const domain = item.competitor_domain || 'unknown';\n  if (!competitorsByDomain[domain]) {\n    competitorsByDomain[domain] = 0;\n  }\n  competitorsByDomain[domain]++;\n});\n\nconsole.log('4. Keywords by competitor domain:');\nObject.keys(competitorsByDomain).forEach(domain => {\n  console.log(`   - ${domain}: ${competitorsByDomain[domain]} keywords`);\n});\n\n// Build a set of target keywords (lowercase) for fast lookup\nconst targetKeywordsSet = new Set(\n  targetItems\n    .map(kw => {\n      const keyword = (kw.keyword || '').toString().trim();\n      return keyword.toLowerCase();\n    })\n    .filter(k => k !== '' && k !== 'null' && k !== 'undefined')\n);\n\nconsole.log('5. Target keywords set size:', targetKeywordsSet.size);\n\n// If no valid target keywords, return empty\nif (targetKeywordsSet.size === 0) {\n  console.log('❌ No valid target keywords');\n  return [];\n}\n\n// Get original input data\nconst originalInput = $('Read Input').first().json || {};\n\n// Find gap keywords (competitor keywords not in target)\nconst gapKeywords = [];\nconst seenGaps = new Set();\nlet skippedDuplicates = 0;\nlet skippedExisting = 0;\n\ncompetitorItems.forEach(kw => {\n  // Validate keyword exists and is not empty\n  if (!kw || !kw.keyword) return;\n  \n  const keyword = String(kw.keyword).trim();\n  if (!keyword || keyword === '') return;\n  \n  const keywordLower = keyword.toLowerCase().trim();\n  if (!keywordLower || keywordLower === '') return;\n\n  // Skip if already seen\n  if (seenGaps.has(keywordLower)) {\n    skippedDuplicates++;\n    return;\n  }\n  \n  // Skip if exists in target\n  if (targetKeywordsSet.has(keywordLower)) {\n    skippedExisting++;\n    return;\n  }\n\n  // Mark as seen and add to gap keywords\n  seenGaps.add(keywordLower);\n\n  // Build gap keyword object with proper null handling\n  gapKeywords.push({\n    keyword,\n    search_volume: kw.search_volume ?? 0,\n    competition: kw.competition ?? null,\n    competition_level: kw.competition_level || 'UNKNOWN',\n    cpc: kw.cpc ?? null,\n    keyword_difficulty: kw.keyword_difficulty ?? null,\n    avg_backlinks: kw.avg_backlinks ?? 0,\n    avg_rank: kw.avg_rank ?? null,\n    search_intent: kw.search_intent || 'unknown',\n    competitor_domain: kw.competitor_domain || 'unknown',  // ⚠️ PRESERVE competitor domain\n    target_domain: originalInput.domain || 'unknown',\n    target_url: originalInput.target_url || '',\n    email: originalInput.email || '',\n  });\n});\n\nconsole.log('6. Gap analysis complete:');\nconsole.log(`   - Gap keywords found: ${gapKeywords.length}`);\nconsole.log(`   - Skipped (duplicates): ${skippedDuplicates}`);\nconsole.log(`   - Skipped (already in target): ${skippedExisting}`);\n\n// Group by competitor for summary\nconst gapsByCompetitor = {};\ngapKeywords.forEach(kw => {\n  const comp = kw.competitor_domain || 'unknown';\n  if (!gapsByCompetitor[comp]) {\n    gapsByCompetitor[comp] = 0;\n  }\n  gapsByCompetitor[comp]++;\n});\n\nconsole.log('7. Gap keywords by competitor:');\nObject.keys(gapsByCompetitor).forEach(domain => {\n  console.log(`   - ${domain}: ${gapsByCompetitor[domain]} gaps`);\n});\n\n// Return empty array if no gaps found (not [{}])\nif (gapKeywords.length === 0) {\n  console.log('❌ No gap keywords found\\n');\n  return [];\n}\n\nconsole.log('8. ✅ Returning', gapKeywords.length, 'gap keywords to next node\\n');\n\n// Return gap keywords as n8n items\nreturn gapKeywords.map(kw => ({ json: kw }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8336,
+        2848
+      ],
+      "id": "8cf282ce-9d37-414f-98a6-766975247f35",
+      "name": "Gap Analysis",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// FIX 3: Filter High Volume Keywords\n//\n// PROBLEM: The old code required avg_rank <= 20 which dropped\n// ALL competitor keywords (they had ranks of 145-724).\n// The OR condition (volume >= 500) rescued some but dropped low\n// volume gems.\n//\n// FIX: Remove the rank requirement entirely for competitor keywords.\n// For keyword gap analysis, rank doesn't matter — we want ALL\n// keywords competitors rank for that we DON'T rank for yet,\n// regardless of their absolute position.\n// Only filter by minimum search volume to avoid junk keywords.\n// ============================================================\n\nconst items = $input.all();\n\n// Minimum search volume threshold — keep this low to capture long-tail gems\nconst MIN_SEARCH_VOLUME = 100;\n\nconst filtered = items\n  .map(item => item.json)\n  .filter(kw => {\n    if (!kw || !kw.keyword) return false;\n\n    const volume = kw.search_volume || 0;\n\n    // Only filter out truly zero-volume keywords\n    // Do NOT filter by rank — rank doesn't matter for gap analysis\n    // (we want keywords competitors rank for, regardless of position)\n    return volume >= MIN_SEARCH_VOLUME;\n  })\n  .sort((a, b) => {\n    // Sort by: search_volume DESC (best opportunities first)\n    // Secondary: keyword_difficulty ASC (easier to rank for first)\n    const volDiff = (b.search_volume || 0) - (a.search_volume || 0);\n    if (volDiff !== 0) return volDiff;\n    return (a.keyword_difficulty || 50) - (b.keyword_difficulty || 50);\n  });\n\nreturn filtered.map(kw => ({ json: kw }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8560,
+        2848
+      ],
+      "id": "b89d6978-7bea-4a2f-b729-d7a77b4f5e1c",
+      "name": "Filter High Volume Keywords",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        8096,
+        2848
+      ],
+      "id": "9f35269e-926e-4c16-ad8b-64e45a10854c",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// UPDATED: Generate final report + LLM prompt (Markdown)\n// SIMPLIFIED TABLE: Only 4 required columns\n// REMOVED: \"Prepared for\", \"Prepared by\", and \"Contact\" sections\n// REMOVED: Unnecessary columns (CPC, Avg Rank, Search Intent, Competition)\n// ============================================================\n\n// 1) All filtered gap keywords coming into this node\nconst items = $input.all();\nconst keywords = items.map(item => item.json || {}).filter(kw => kw && kw.keyword);\n\n// 2) Get original input from Read Input node\nconst originalInput = $('Read Input').first().json || {};\n\n// 3) Helper: clean a single keyword object (drop null/0 fields)\nfunction cleanKeyword(kw) {\n  const out = {\n    keyword: kw.keyword,\n    competitor_domain: kw.competitor_domain || undefined,\n  };\n\n  if (kw.search_volume && kw.search_volume > 0) {\n    out.search_volume = kw.search_volume;\n  }\n  if (kw.keyword_difficulty !== null && kw.keyword_difficulty !== undefined) {\n    out.keyword_difficulty = kw.keyword_difficulty;\n  }\n\n  // Remove keys with undefined so they don't appear in JSON\n  Object.keys(out).forEach(k => {\n    if (out[k] === undefined || out[k] === null) {\n      delete out[k];\n    }\n  });\n\n  return out;\n}\n\n// 4) Clean all keywords (only fields with real values)\nconst cleanedKeywords = keywords\n  .map(cleanKeyword)\n  .filter(kw => Object.keys(kw).length > 1);\n\n// If nothing left after cleaning, return empty (LLM will have nothing useful)\nif (cleanedKeywords.length === 0) {\n  return [{\n    json: {\n      message: 'No valid gap keywords with non-zero metrics to report.',\n      target_domain: originalInput.domain || '',\n      target_url: originalInput.target_url || '',\n      email: originalInput.email || '',\n      report_date: new Date().toISOString(),\n    },\n  }];\n}\n\n// 5) Summary stats (only over non-zero metrics)\nconst totalKeywords = cleanedKeywords.length;\nconst totalSearchVolume = cleanedKeywords.reduce(\n  (sum, kw) => sum + (kw.search_volume || 0),\n  0\n);\n\nconst difficultyKeywords = cleanedKeywords.filter(\n  kw => kw.keyword_difficulty && kw.keyword_difficulty > 0\n);\nconst avgDifficulty = difficultyKeywords.length\n  ? difficultyKeywords.reduce((sum, kw) => sum + kw.keyword_difficulty, 0) / difficultyKeywords.length\n  : null;\n\n// Build summary object with only non-zero / non-null values\nconst summary = {};\nif (totalKeywords > 0) {\n  summary.total_gap_keywords = totalKeywords;\n}\nif (totalSearchVolume > 0) {\n  summary.total_potential_search_volume = totalSearchVolume;\n}\nif (avgDifficulty !== null && avgDifficulty > 0) {\n  summary.average_keyword_difficulty = Math.round(avgDifficulty * 100) / 100;\n}\n\n// 6) Group by competitor (with cleaned keywords only)\nconst keywordsByCompetitor = {};\ncleanedKeywords.forEach(kw => {\n  const comp = kw.competitor_domain || 'Unknown';\n  if (!keywordsByCompetitor[comp]) {\n    keywordsByCompetitor[comp] = [];\n  }\n  keywordsByCompetitor[comp].push(kw);\n});\n\n// Remove competitors that have no valid keywords (safety)\nObject.keys(keywordsByCompetitor).forEach(comp => {\n  if (!keywordsByCompetitor[comp] || keywordsByCompetitor[comp].length === 0) {\n    delete keywordsByCompetitor[comp];\n  }\n});\n\nconst competitorsAnalyzed = Object.keys(keywordsByCompetitor).length;\nif (competitorsAnalyzed > 0) {\n  summary.competitors_analyzed = competitorsAnalyzed;\n}\n\n// Log for debugging\nconsole.log('Keywords grouped by competitor:');\nObject.keys(keywordsByCompetitor).forEach(comp => {\n  console.log(`  - ${comp}: ${keywordsByCompetitor[comp].length} keywords`);\n});\n\n// 7) Build a compact data object that only contains non-null / non-zero values\nconst reportData = {\n  target_domain: originalInput.domain || '',\n  target_url: originalInput.target_url || '',\n  email: originalInput.email || '',\n  report_date: new Date().toISOString(),\n  summary,\n  keywords_by_competitor: keywordsByCompetitor,\n  keywords: cleanedKeywords,\n};\n\n// 8) Build the LLM prompt (Markdown instructions + JSON data)\nconst mdIntroLines = [\n  `You are an expert SEO consultant.`,\n  `Using the JSON data below, write a clear, actionable **Markdown** report for a website owner.`,\n  ``,\n  `**CRITICAL TABLE FORMAT REQUIREMENTS:**`,\n  `- Each keyword table MUST have EXACTLY 4 columns (no more, no less)`,\n  `- Column order MUST be: Keyword | Search Volume | KD | Traffic Potential`,\n  `- DO NOT add any other columns (no CPC, no Avg Rank, no Search Intent, no Competition)`,\n  `- Example table header:`,\n  `  | Keyword | Search Volume | KD | Traffic Potential |`,\n  `  |---------|---------------|-----|-------------------|`,\n  ``,\n  `**Structure Requirements:**`,\n  `1. Title: \"# SEO Keyword Gap Analysis Report for [target_domain]\"`,\n  `2. Brief Introduction: Explain the purpose of this gap analysis report (2-3 sentences)`,\n  `3. Key Stats Summary: Display summary metrics in bullet points`,\n  `   - Total gap keywords found`,\n  `   - Total potential search volume`,\n  `   - Average keyword difficulty`,\n  `   - Number of competitors analyzed`,\n  `4. **Top Gap Keywords by Competitor** (MOST IMPORTANT SECTION):`,\n  `   - Create a separate subsection for EACH competitor`,\n  `   - Subsection heading format: \"### Competitor: [domain name]\"`,\n  `   - Brief intro line: how many keywords and combined search volume`,\n  `   - Show keyword table with top keywords (sorted by search volume DESC)`,\n  `   - Use ONLY 4 columns: Keyword | Search Volume | KD | Traffic Potential`,\n  `   - Repeat for ALL competitors in the data`,\n  `5. Traffic Potential Explanation: Brief explanation of how traffic potential was calculated`,\n  `6. Next Steps: Provide 3-5 actionable SEO recommendations`,\n  ``,\n  `**CRITICAL - DO NOT INCLUDE:**`,\n  `- ❌ DO NOT add \"Prepared for:\" anywhere in the report`,\n  `- ❌ DO NOT add \"Prepared by:\" anywhere in the report`,\n  `- ❌ DO NOT add \"Contact:\" anywhere in the report`,\n  `- ❌ DO NOT add any email addresses in the report`,\n  `- ❌ DO NOT add consultant information`,\n  `- ❌ DO NOT add extra columns to tables (only 4 columns allowed)`,\n  `- The report MUST end with the \"Next Steps\" section`,\n  ``,\n  `**Traffic Potential Calculation:**`,\n  `Calculate \"Traffic Potential\" for each keyword using this formula:`,\n  `Traffic Potential = Search Volume × ((100 - KD) / 100) × 0.3`,\n  `This estimates potential monthly traffic assuming you can rank in top 3-5 positions.`,\n  `Round to nearest whole number.`,\n  ``,\n  `**Important Notes:**`,\n  `- Only show metrics that exist in the JSON data`,\n  `- If KD is missing, use \"N/A\" in table and exclude from traffic calculation`,\n  `- Focus on actionable insights`,\n  `- Keep explanations concise`,\n  ``,\n  `**Example Table Format (FOLLOW THIS EXACTLY):**`,\n  ``,\n  `### Competitor: example-competitor.com`,\n  `This competitor offers 45 keyword opportunities with a combined search volume of 125,000.`,\n  ``,\n  `| Keyword | Search Volume | KD | Traffic Potential |`,\n  `|---------|---------------|-----|-------------------|`,\n  `| car wash near me | 450,000 | 26 | 99,900 |`,\n  `| hand car wash | 40,500 | 9 | 11,043 |`,\n  `| mobile car wash | 12,100 | 15 | 3,086 |`,\n  ``,\n  `Now here is the raw data for the report in JSON format:`,\n  ``,\n];\n\nconst llmPrompt =\n  mdIntroLines.join('\\n') +\n  '\\n\\n\\n' +\n  JSON.stringify(reportData, null, 2) +\n  '\\n```' +\n  '\\n\\n' +\n  `Generate the final SEO keyword gap report in **Markdown** format using the data above.` +\n  `\\n\\nREMEMBER:` +\n  `\\n- Use ONLY 4 columns: Keyword | Search Volume | KD | Traffic Potential` +\n  `\\n- DO NOT add \"Prepared for\", \"Prepared by\", or \"Contact\" sections` +\n  `\\n- Create a section for EVERY competitor with their keyword table` +\n  `\\n- End with \"Next Steps\" section only`;\n\n// 9) Return data for the next node (e.g., LLM node)\nreturn [{\n  json: {\n    target_domain: reportData.target_domain,\n    target_url: reportData.target_url,\n    email: reportData.email,\n    report_date: reportData.report_date,\n    summary: reportData.summary,\n    keywords_by_competitor: reportData.keywords_by_competitor,\n    keywords: reportData.keywords,\n    llm_prompt: llmPrompt,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8592,
+        3104
+      ],
+      "id": "abc6074a-d5f2-4dde-9958-83ad49808465",
+      "name": "Generate Report Prompt",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.llm_prompt }}",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        8816,
+        2848
+      ],
+      "id": "9fd28c3d-3415-4b86-a65e-25df8fb90290",
+      "name": "Report Generator",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        8816,
+        3088
+      ],
+      "id": "691df7b6-6198-4ffd-af08-67f24958c3cf",
+      "name": "gpt",
+      "credentials": {
+        "openAiApi": {
+          "id": "H5LXr3raFFEHNnlb",
+          "name": "OpenAi account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convert LLM output to Markdown file (SEO Keyword Gap Report) - FIXED VERSION\n\n// 1) Get markdown text from LLM output (first item)\nconst llmItem = $input.first().json || {};\nconst markdown = llmItem.text || llmItem.markdown || '# Empty report\\n';\n\n// 2) Extract website from multiple possible sources\nlet website = 'website'; // default fallback\n\n// Method 1: Try to get from \"Read Input\" node (primary source)\ntry {\n  const readInput = $('Read Input');\n  if (readInput && readInput.first()) {\n    const inputData = readInput.first().json || {};\n    // Check for domain first (cleaner), then target_url, then other fields\n    website = inputData.domain || \n              inputData.target_url || \n              inputData.target_domain || \n              inputData.target || \n              inputData.website || \n              website;\n    \n    // If target_url contains http:// or https://, extract just the domain\n    if (website && website.includes('://')) {\n      website = website.replace(/https?:\\/\\//i, '').replace(/^www\\./i, '').split('/')[0];\n    }\n  }\n} catch (e) {\n  // Node doesn't exist, continue to other methods\n}\n\n// Method 2: Try to get from \"Report Generator\" node (if it exists)\nif (website === 'website') {\n  try {\n    const reportGenerator = $('Report Generator');\n    if (reportGenerator && reportGenerator.first()) {\n      const reportData = reportGenerator.first().json || {};\n      website = reportData.target_domain || reportData.target_url || reportData.target || reportData.website || website;\n    }\n  } catch (e) {\n    // Node doesn't exist, continue to other methods\n  }\n}\n\n// Optional date range\nlet dateFrom = '';\nlet dateTo = '';\n\ntry {\n  const reportGenerator = $('Report Generator');\n  if (reportGenerator && reportGenerator.first()) {\n    const reportData = reportGenerator.first().json || {};\n    dateFrom = reportData.date_from || reportData.dateFrom || '';\n    dateTo = reportData.date_to || reportData.dateTo || '';\n  }\n} catch (e) {\n  // Node doesn't exist, use empty strings\n}\n\n// Current date for filename and metadata\nconst date = new Date().toISOString().split('T')[0];\n\n// 3) Clean website string for safe filename\nconst cleanWebsite = String(website)\n  .replace(/https?:\\/\\//i, '')\n  .replace(/^www\\./i, '')\n  .replace(/[^a-zA-Z0-9]/g, '_')\n  .replace(/_+/g, '_')\n  .replace(/^_+|_+$/g, '');\n\n// 4) Filename pattern: SEO Keyword Gap Report_<website>_<date>.md\nconst filename = `SEO Keyword Gap Report_${cleanWebsite || 'website'}_${date}.md`;\n\n// 5) Convert markdown text to base64 for binary\nconst base64Content = Buffer.from(markdown, 'utf8').toString('base64');\n\n// 6) Return JSON + binary so n8n can write the file\nreturn {\n  json: {\n    filename,\n    targetWebsite: website,\n    generatedAt: date,\n    dateFrom,\n    dateTo,\n    markdownContent: markdown,\n  },\n  binary: {\n    data: {\n      data: base64Content,\n      mimeType: 'text/markdown',\n      fileName: filename,\n      fileExtension: 'md',\n    },\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9168,
+        2848
+      ],
+      "id": "7e8e9270-6b77-4ebb-b183-74098b0188fd",
+      "name": "Convert To Markdown"
+    },
+    {
+      "parameters": {
+        "name": "={{ $json.filename }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "18S3eHxMVsxORpZcUPQ7aXk-lX5qfj6dW",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        9184,
+        3104
+      ],
+      "id": "f7c250f1-b52e-47d5-babd-a98425bbc513",
+      "name": "Google Drive",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "eBh6pygRVxYps7mk",
+          "name": "Google Drive account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "automation@programmx.com",
+        "toEmail": "={{ $(\"Read Input\").first().json.email }}",
+        "subject": "=SEO Keyword Gap Report - {{ $('Convert To Markdown').first().json.targetWebsite }}",
+        "html": "=<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\n    .container { max-width: 600px; margin: 0 auto; padding: 20px; }\n    .header { background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center; }\n    .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; }\n    .button { display: inline-block; background: #2b6cb0; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }\n    .footer { text-align: center; margin-top: 20px; color: #718096; font-size: 12px; }\n    .highlight { background: #ebf8ff; padding: 15px; border-radius: 5px; border-left: 4px solid #2b6cb0; margin: 15px 0; }\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n    <div class=\"header\">\n      <h1>📊 SEO Keyword Gap Report Ready</h1>\n    </div>\n    <div class=\"content\">\n      <p>Hello,</p>\n      \n      <p>Your <strong>SEO Keyword Gap Report</strong> has been generated and saved in Google Drive.</p>\n      \n      <div class=\"highlight\">\n        <h3 style=\"margin-top: 0;\">📋 Report Details:</h3>\n        <ul style=\"margin-bottom: 0;\">\n          <li><strong>Website:</strong> {{ $('Convert To Markdown').first().json.targetWebsite }}</li>\n          <li><strong>Generated:</strong> {{ $now.format('d MMMM yyyy') }}</li>\n          <li><strong>File:</strong> {{ $('Convert To Markdown').first().json.filename }}</li>\n        </ul>\n      </div>\n      \n      <p style=\"text-align: center;\">\n        <a href=\"https://drive.google.com/file/d/{{ $('Google Drive').first().json.id }}/view\" class=\"button\">\n          📄 View Report in Google Drive\n        </a>\n      </p>\n      \n      <h3>📈 What's Included:</h3>\n      <ul>\n        <li>Overview of competitor-based keyword gaps</li>\n        <li>High-value keywords by search volume and CPC</li>\n        <li>Keyword intent and opportunity analysis</li>\n        <li>Estimated traffic potential per opportunity</li>\n        <li>Competitor comparison and priority actions</li>\n        <li>Strategic SEO recommendations and next steps</li>\n      </ul>\n    </div>\n  </div>\n</body>\n</html>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        9600,
+        2848
+      ],
+      "id": "c0afb077-b15a-4cfd-b258-9ee17385971b",
+      "name": "Send Report",
+      "webhookId": "f6e37ca6-3b9a-45f1-8f7f-cd311eb924f1",
+      "credentials": {
+        "smtp": {
+          "id": "Powsux0m0r1TlNbw",
+          "name": "SMTP account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "  const res = $input.first().json || {};\n  return [{\n    json: {\n      error: true,       \n      status_code: res.status_code,\n      status_message: res.status_message || 'Unknown error',\n      raw: res,\n    },\n  }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7568,
+        2416
+      ],
+      "id": "7e12c328-38da-45a1-a129-9b15249e5f1e",
+      "name": "Error"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cb4ed2ba-e7d2-4709-99bc-dd9c6753db74",
+              "leftValue": "={{ $json.status_code === 20000 && ($json.tasks_error || 0) === 0 }}",
+              "rightValue": 20000,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        6016,
+        2832
+      ],
+      "id": "5c402f91-9a67-4ff4-beb2-83a98ed0f189",
+      "name": "Keywords"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cb4ed2ba-e7d2-4709-99bc-dd9c6753db74",
+              "leftValue": "={{ $json.status_code === 20000 && ($json.tasks_error || 0) === 0 }}",
+              "rightValue": 20000,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        6576,
+        3408
+      ],
+      "id": "2b46ec2f-0e8c-4b87-9fec-dc58666b5144",
+      "name": "Competitors"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cb4ed2ba-e7d2-4709-99bc-dd9c6753db74",
+              "leftValue": "={{ $json.status_code === 20000 && (($json.tasks_error || 0) === 0) }}",
+              "rightValue": 20000,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        7280,
+        3376
+      ],
+      "id": "c1fceae2-5a50-488f-a31d-b1aaa34aeb18",
+      "name": "Keywords For Competitor",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "fromEmail": "automation@programmx.com",
+        "toEmail": "={{ $(\"Read Input\").first().json.email }}",
+        "subject": "=DataForSEO Error in SEO Keyword Gap Workflow",
+        "html": "==<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\n    .container { max-width: 600px; margin: 0 auto; padding: 20px; }\n    .header { background: linear-gradient(135deg, #742a2a 0%, #c53030 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center; }\n    .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; }\n    .footer { text-align: center; margin-top: 20px; color: #718096; font-size: 12px; }\n    .highlight { background: #fff5f5; padding: 15px; border-radius: 5px; border-left: 4px solid #c53030; margin: 15px 0; }\n    .code-block { background: #2d3748; color: #e2e8f0; padding: 15px; border-radius: 5px; font-family: Consolas, Monaco, monospace; font-size: 12px; white-space: pre-wrap; word-wrap: break-word; }\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n    <div class=\"header\">\n      <h1>⚠️ DataForSEO Error in SEO Keyword Gap Workflow</h1>\n    </div>\n    <div class=\"content\">\n      <p>Hello,</p>\n      <p>\n        The <strong>SEO Keyword Gap Report workflow</strong> failed due to an error returned by the\n        <strong>DataForSEO API</strong>.\n      </p>\n\n      <div class=\"highlight\">\n        <h3 style=\"margin-top: 0;\">❌ Error Details</h3>\n        <ul style=\"margin-bottom: 0;\">\n          <li><strong>Status Code:</strong> {{ $json.status_code }}</li>\n          <li><strong>Status Message:</strong> {{ $json.status_message }}</li>\n          <li><strong>Target:</strong> {{ $('Read Input').first().json.domain || 'N/A' }}</li>\n          <li><strong>Time:</strong> {{ $now.toISO() }}</li>\n        </ul>\n      </div>\n    </div>\n  </div>\n</body>\n</html>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        9584,
+        2416
+      ],
+      "id": "6891ec45-161d-4949-8244-6cab05edc314",
+      "name": "Send Error",
+      "webhookId": "d3b3147c-ee42-408c-9dbc-c4acad84ecd1",
+      "credentials": {
+        "smtp": {
+          "id": "Powsux0m0r1TlNbw",
+          "name": "SMTP account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Website information - can be extended via input or use LLM to classify\n// For now, use a basic database but allow override from input\nconst websiteInfo = {\n  'delta-solution.co.uk': {\n    business_type: 'Moving and Relocation Services',\n    services_offered: 'moving services, home relocation, residential removals, corporate relocations, commercial moving, storage and moving, packing services, furniture installation, home staging',\n    description: 'Movers that move things from one place to another'\n  },\n  'bubblescarspa.com': {\n    business_type: 'Car Washing Services',\n    services_offered: 'car wash, hand car wash, car detailing, interior cleaning, exterior cleaning, vehicle cleaning, car valeting',\n    description: 'Car washing services'\n  },\n  'cerberus-tactical.com': {\n    business_type: 'Security Services',\n    services_offered: 'security services, tactical security, close protection, bodyguard services, event security, corporate security, security consultancy, risk assessment, personal protection, manned guarding',\n    description: 'Security and tactical protection services'\n  },\n  'jerrichaplinfinance.co.uk': {\n    business_type: 'Financial Services',\n    services_offered: 'financial advice, financial planning, mortgage advice, investment planning, pension advice, wealth management, insurance, loans, financial consultancy, personal finance',\n    description: 'Personal and business financial advisory services'\n  },\n  'chameleonbdsltd.co.uk': {\n    business_type: 'Business Development Services',\n    services_offered: 'business development, business consultancy, growth strategy, sales development, market expansion, partnership development, business coaching, lead generation, strategic planning, business transformation',\n    description: 'Business development and strategic growth consultancy'\n  },\n  'sunfloristandevents.co.uk': {\n    business_type: 'Florist and Events Services',\n    services_offered: 'flower delivery, bouquets, floral arrangements, valentines flowers, mothers day flowers, wedding flowers, event decoration, funeral flowers, birthday flowers, seasonal flowers, gift flowers, flower shop',\n    description: 'Florist offering flowers and event decoration for occasions like Valentines Day and Mothers Day'\n  },\n  'wzacademy.co.uk': {\n    business_type: 'Sports and Football Academy',\n    services_offered: 'football camp, football training, soccer academy, youth football, kids football camp, football coaching, sports academy, football skills, summer football camp, football development program',\n    description: 'Sports academy offering football and soccer training camps for youth'\n  },\n  'interlacecreativeprint.co.uk': {\n    business_type: 'Printing Services',\n    services_offered: 'printing services, business card printing, flyer printing, brochure printing, banner printing, poster printing, custom printing, digital printing, large format printing, promotional printing, graphic design, marketing materials',\n    description: 'Creative printing services for business and personal marketing materials'\n  },\n  // Add more domains as needed\n};\n// Get domain from Read Input\nconst inputData = $input.first().json || {};\nconst domain = (inputData.domain || '').toLowerCase().replace(/^www\\./, '').replace(/^https?:\\/\\//, '').split('/')[0];\n// Check if business_type and services_offered are provided in input (allows override)\nconst businessType = inputData.business_type || '';\nconst servicesOffered = inputData.services_offered || '';\n// Get website info from database or use provided values\nlet info = {\n  business_type: businessType || '',\n  services_offered: servicesOffered || '',\n  description: 'Unknown business type'\n};\n// If not provided in input, try database\nif (!businessType && !servicesOffered) {\n  info = websiteInfo[domain] || info;\n}\n// Return all input data plus website info\nreturn [{\n  json: {\n    ...inputData,\n    business_type: info.business_type,\n    services_offered: info.services_offered,\n    business_description: info.description,\n    website_info_source: businessType || servicesOffered ? 'user_input' : (websiteInfo[domain] ? 'database' : 'default')\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5024,
+        2832
+      ],
+      "id": "8371ceab-ccda-45bc-9385-4c8a98d68641",
+      "name": "Website Info"
+    },
+    {
+      "parameters": {
+        "url": "=https://{{ $json.domain.replace(/^https?:\\/\\//, '').replace(/^www\\./, '') }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        5216,
+        3168
+      ],
+      "id": "d560bc69-354b-4655-9c31-f18ff739e2ef",
+      "name": "Fetch Homepage HTML"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get HTML from HTTP Request\nconst html = $input.first().json.data || $input.first().json || '';\nconst inputData = $('Website Info').first().json || {};\n\n// Extract key content from HTML\nfunction extractContent(html) {\n  if (!html || typeof html !== 'string') {\n    return { title: '', h1: '', meta_description: '', key_paragraphs: '' };\n  }\n  \n  // Extract title\n  const titleMatch = html.match(/<title[^>]*>([^<]+)<\\/title>/i);\n  const title = titleMatch ? titleMatch[1].trim() : '';\n  \n  // Extract H1\n  const h1Match = html.match(/<h1[^>]*>([^<]+)<\\/h1>/i);\n  const h1 = h1Match ? h1Match[1].trim() : '';\n  \n  // Extract meta description\n  const metaMatch = html.match(/<meta[^>]*name=[\"']description[\"'][^>]*content=[\"']([^\"']+)[\"']/i);\n  const meta_description = metaMatch ? metaMatch[1].trim() : '';\n  \n  // Extract first 3 paragraphs (first 800 chars)\n  const pMatches = html.match(/<p[^>]*>([^<]+)<\\/p>/gi) || [];\n  const paragraphs = pMatches\n    .slice(0, 5)\n    .map(p => p.replace(/<[^>]+>/g, '').trim())\n    .filter(p => p.length > 20)\n    .join(' ')\n    .substring(0, 800);\n  \n  // Extract service-related content\n  const serviceMatches = html.match(/<li[^>]*>([^<]+(?:service|removal|moving|wash|cleaning)[^<]*)<\\/li>/gi) || [];\n  const services = serviceMatches\n    .slice(0, 10)\n    .map(s => s.replace(/<[^>]+>/g, '').trim())\n    .filter(s => s.length > 0)\n    .join(', ');\n  \n  return { \n    title, \n    h1, \n    meta_description, \n    key_paragraphs: paragraphs,\n    services_list: services\n  };\n}\n\nconst content = extractContent(html);\nconst combinedText = `${content.title} ${content.h1} ${content.meta_description} ${content.key_paragraphs} ${content.services_list}`.trim();\n\n// Return combined data\nreturn [{\n  json: {\n    ...inputData,\n    homepage_title: content.title,\n    homepage_h1: content.h1,\n    homepage_meta_description: content.meta_description,\n    homepage_key_paragraphs: content.key_paragraphs,\n    homepage_services_list: content.services_list,\n    homepage_combined_text: combinedText,\n    homepage_scraped: true\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5472,
+        3168
+      ],
+      "id": "0b2c9b10-7dd5-44bc-923d-158b79c814ba",
+      "name": "Extract Homepage Content"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an SEO keyword filter. Analyze if a target website keyword is relevant to keep.\n\nTARGET WEBSITE INFORMATION (Our Website):\n- Domain: {{ $json.target_domain }}\n- Business Type: {{ $json.business_type }}\n- Services Offered: {{ $json.services_offered }}\n- Business Description: {{ $json.business_description }}\n\nTARGET WEBSITE HOMEPAGE CONTENT (Our Website):\n- Title: {{ $json.homepage_title }}\n- H1: {{ $json.homepage_h1 }}\n- Meta Description: {{ $json.homepage_meta_description }}\n- Key Content: {{ $json.homepage_key_paragraphs }}\n- Services List: {{ $json.homepage_services_list }}\n\nTARGET KEYWORD TO EVALUATE:\n- Keyword: {{ $json.keyword }}\n- Search Volume: {{ $json.search_volume }}\n- Competition: {{ $json.competition }}\n- Competition Level: {{ $json.competition_level }}\n- CPC: {{ $json.cpc }}\n- Keyword Difficulty: {{ $json.keyword_difficulty }}\n- Avg Backlinks: {{ $json.avg_backlinks }}\n- Avg Rank: {{ $json.avg_rank }}\n- Search Intent: {{ $json.search_intent }}\n- Target Domain: {{ $json.target_domain }}\n\nINSTRUCTIONS:\n1. Analyze if this TARGET keyword is relevant to OUR TARGET WEBSITE's business type and services\n2. We want to keep keywords that are relevant to our business\n3. CRITICAL: Your response MUST be a JSON object that includes:\n   - The decision (keep: true/false)\n   - The reason for your decision\n   - ALL the keyword data from the input (keyword, search_volume, competition, competition_level, cpc, keyword_difficulty, avg_backlinks, avg_rank, search_intent, target_domain)\n   - ALL the target website information fields (business_type, services_offered, business_description, homepage_title, homepage_h1, homepage_meta_description, homepage_key_paragraphs, homepage_services_list)\n   - The source field set to \"target\"\n\n4. Your response MUST be in this exact JSON format (include ALL fields from input):\n{\n  \"keep\": true or false,\n  \"reason\": \"brief explanation\",\n  \"keyword\": \"{{ $json.keyword }}\",\n  \"search_volume\": {{ $json.search_volume }},\n  \"competition\": {{ $json.competition }},\n  \"competition_level\": \"{{ $json.competition_level }}\",\n  \"cpc\": {{ $json.cpc }},\n  \"keyword_difficulty\": {{ $json.keyword_difficulty }},\n  \"avg_backlinks\": {{ $json.avg_backlinks }},\n  \"avg_rank\": {{ $json.avg_rank }},\n  \"search_intent\": \"{{ $json.search_intent }}\",\n  \"target_domain\": \"{{ $json.target_domain }}\",\n  \"source\": \"target\",\n  \"business_type\": \"{{ $json.business_type }}\",\n  \"services_offered\": \"{{ $json.services_offered }}\",\n  \"business_description\": \"{{ $json.business_description }}\",\n  \"homepage_title\": \"{{ $json.homepage_title }}\",\n  \"homepage_h1\": \"{{ $json.homepage_h1 }}\",\n  \"homepage_meta_description\": \"{{ $json.homepage_meta_description }}\",\n  \"homepage_key_paragraphs\": \"{{ $json.homepage_key_paragraphs }}\",\n  \"homepage_services_list\": \"{{ $json.homepage_services_list }}\"\n}\n\n5. Keep keywords that:\n   - Relate to our target website's business type\n   - Match our target website's services offered\n   - Are relevant based on homepage content\n   - Could be opportunities for our target website to rank for\n\n6. Ignore keywords that:\n   - Are about completely unrelated industries (not matching our business type)\n   - Don't match our business description or services at all\n   - Are clearly irrelevant based on homepage content\n\nIMPORTANT RULES:\n- Focus on business type and service relevance\n- Generic service keywords are always valuable\n- You MUST include ALL the keyword data and target website fields in your JSON response, even if keep is false (the data is needed for downstream processing)\n\nRespond with ONLY the JSON object, nothing else. Do not wrap it in markdown code blocks.",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        7520,
+        2832
+      ],
+      "id": "fbb5bb0a-c954-4458-87cc-87a51091a915",
+      "name": "Filter Keywords"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        7520,
+        3040
+      ],
+      "id": "059b70e4-2d07-47a2-a137-8968194c20c0",
+      "name": "GPT 4.1 MINI",
+      "credentials": {
+        "openAiApi": {
+          "id": "H5LXr3raFFEHNnlb",
+          "name": "OpenAi account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Apply Keyword Filter: parse LLM JSON responses and always output items\n// - One output item per LLM response (if JSON can be parsed)\n// - We keep the \"keep\" flag but do NOT drop items when keep === false\n// - Downstream nodes can decide what to do with llm_filter_decision\nconst inputItems = $input.all();\nconst results = [];\n\nfor (const item of inputItems) {\n  const inputJson = item.json || {};\n  const llmResponse = inputJson.text || inputJson.response || inputJson.output || '';\n\n  if (!llmResponse) {\n    results.push({\n      json: {\n        keyword: '',\n        source: 'target',\n        target_domain: inputJson.target_domain || 'unknown',\n        llm_filter_decision: false,\n        llm_filter_reason: 'No LLM response text',\n        has_empty_keyword: true,\n      },\n    });\n    continue;\n  }\n\n  let llmData = null;\n\n  if (typeof llmResponse === 'string') {\n    try {\n      llmData = JSON.parse(llmResponse);\n    } catch (e) {\n      try {\n        let cleaned = llmResponse.trim();\n        cleaned = cleaned\n          .replace(/```json/gi, '')\n          .replace(/```/g, '')\n          .trim();\n        const jsonMatch = cleaned.match(/\\{[\\s\\S]*\\}/);\n        if (jsonMatch) {\n          llmData = JSON.parse(jsonMatch[0]);\n        }\n      } catch (e2) {\n        llmData = null;\n      }\n    }\n  } else {\n    try {\n      llmData = typeof llmResponse === 'object'\n        ? llmResponse\n        : JSON.parse(JSON.stringify(llmResponse));\n    } catch (e) {\n      llmData = null;\n    }\n  }\n\n  if (!llmData || typeof llmData !== 'object') {\n    results.push({\n      json: {\n        keyword: '',\n        source: 'target',\n        target_domain: inputJson.target_domain || 'unknown',\n        llm_raw: llmResponse,\n        llm_filter_decision: false,\n        llm_filter_reason: 'Failed to parse LLM JSON',\n        has_empty_keyword: true,\n      },\n    });\n    continue;\n  }\n\n  const keepFlag =\n    llmData.keep === true ||\n    llmData.keep === 'true' ||\n    llmData.keep === 1;\n\n  const reason = llmData.reason || 'LLM decision';\n  const keyword = llmData.keyword ?? '';\n  const hasEmptyKeyword = !keyword.trim();\n\n  const keywordData = {\n    // Core keyword fields\n    keyword: keyword,\n    search_volume: llmData.search_volume ?? 0,\n    competition: llmData.competition ?? null,\n    competition_level: llmData.competition_level || 'UNKNOWN',\n    cpc: llmData.cpc ?? null,\n    keyword_difficulty: llmData.keyword_difficulty ?? null,\n    avg_backlinks: llmData.avg_backlinks ?? 0,\n    avg_rank: llmData.avg_rank ?? null,\n    search_intent: llmData.search_intent || 'unknown',\n    // Target / source info\n    target_domain: llmData.target_domain || inputJson.target_domain || 'unknown',\n    source: llmData.source || 'target',\n    // Target website info (for gap analysis + report)\n    business_type: llmData.business_type || '',\n    services_offered: llmData.services_offered || '',\n    business_description: llmData.business_description || '',\n    homepage_title: llmData.homepage_title || '',\n    homepage_h1: llmData.homepage_h1 || '',\n    homepage_meta_description: llmData.homepage_meta_description || '',\n    homepage_key_paragraphs: llmData.homepage_key_paragraphs || '',\n    homepage_services_list: llmData.homepage_services_list || '',\n    // LLM filter decision metadata\n    llm_filter_decision: keepFlag,\n    llm_filter_reason: reason,\n    // NEW: flag empty keywords instead of silently dropping them\n    has_empty_keyword: hasEmptyKeyword,\n  };\n\n  // CHANGED: output all items, but flag empty-keyword ones\n  // so downstream nodes can filter them out if needed.\n  // Previously this block did `continue` which caused zero output\n  // when ALL upstream keywords were empty (as is the case here).\n  results.push({ json: keywordData });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7840,
+        2832
+      ],
+      "id": "8ef9a76c-81fb-4a00-a7e3-187edeccaa48",
+      "name": "Apply Keyword Filter"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an SEO keyword filter. Analyze if a competitor keyword is relevant to keep for our target website.\n\nTARGET WEBSITE (Our Business):\n- Business Type: {{ $json.target_business_type }}\n- Services Offered: {{ $json.target_services_offered }}\n- Business Description: {{ $json.target_business_description }}\n\nCOMPETITOR KEYWORD TO EVALUATE:\n- Keyword: {{ $json.keyword }}\n- Search Volume: {{ $json.search_volume }}\n- Keyword Difficulty: {{ $json.keyword_difficulty }}\n- Search Intent: {{ $json.search_intent }}\n- Competitor: {{ $json.competitor_domain }}\n\nRULES:\n\n**KEEP Keywords That:**\n✅ Comparison keywords - Mentions our industry + competitor (e.g., \"A vs B\", \"A or B comparison\") - ALWAYS KEEP\n✅ Generic industry/category terms - Describe services we offer without specific brand names - ALWAYS KEEP\n✅ Service/product categories - Related to what we offer, even if mentions different brands/providers - KEEP\n✅ Feature/benefit keywords - Describe features or benefits of services/products in our industry - KEEP\n✅ How-to/educational content - Instructional keywords related to our industry - KEEP\n✅ Generic service terms - General service-related keywords matching what we offer - KEEP\n✅ Location + service - Any location combined with services we offer - KEEP\n✅ Problem-solving queries - Customer pain points in our industry - KEEP\n\n**REJECT Keywords That:**\n❌ Pure competitor branding - Only competitor name with no comparison or generic term\n❌ Completely unrelated industry - Has nothing to do with our business type or services\n❌ Competitor-specific operations - About competitor's internal business (careers, investors, corporate info)\n❌ Other business names - Specific names of other companies unrelated to our services\n❌ Different industry services - Services we clearly don't offer based on our business description\n\n**DECISION LOGIC:**\n1. Check: Does keyword relate to our business type or services offered?\n   - YES → Likely KEEP\n   - NO → Check if it's educational/comparison/generic\n2. Check: Is it purely branded to a specific competitor with no generic value?\n   - YES → REJECT\n   - NO → KEEP\n3. When uncertain → Default to KEEP (better to have than miss opportunities)\n\n**BE LENIENT:** \n- Comparison keywords are ALWAYS valuable\n- Generic terms are ALWAYS valuable\n- Industry-related content is valuable\n- When in doubt → KEEP IT\n\nRespond ONLY with this JSON (no markdown, no code blocks):\n{\"keep\": true, \"reason\": \"brief explanation\"}",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        7664,
+        3360
+      ],
+      "id": "9ff9c68e-2705-49ba-b0dd-52c596f7b6a1",
+      "name": "Filter Competitor"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        7664,
+        3600
+      ],
+      "id": "80282f51-98fb-48d0-85c7-29528a89cdca",
+      "name": "GPT 4.1 MINI1",
+      "credentials": {
+        "openAiApi": {
+          "id": "H5LXr3raFFEHNnlb",
+          "name": "OpenAi account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// Apply Competitor Filter - CORRECT VERSION v3\n// Gets original keywords from Extract Competitor Keywords node\n// because LLM node replaces input with just {text: \"...\"}\n// ============================================================\n\nconsole.log('\\n🔍 === APPLY COMPETITOR FILTER NODE ===\\n');\n\nconst filterItems = $input.all();  // LLM decisions\nconst originalKeywords = $('Extract Competitor Keywords').all();  // ✅ Original keywords\n\nconsole.log('1. LLM filter decisions received:', filterItems.length);\nconsole.log('2. Original competitor keywords available:', originalKeywords.length);\n\n// Validate inputs\nif (!filterItems || filterItems.length === 0) {\n  console.log('❌ No filter items received');\n  return [];\n}\n\nif (!originalKeywords || originalKeywords.length === 0) {\n  console.log('❌ No original keywords found');\n  return [];\n}\n\n// Check if counts match\nif (filterItems.length !== originalKeywords.length) {\n  console.log('⚠️ Warning: Filter count and keyword count mismatch!');\n  console.log(`   Filter items: ${filterItems.length}, Keywords: ${originalKeywords.length}`);\n}\n\nconst results = filterItems.map((filterItem, index) => {\n  try {\n    let filterResult;\n    \n    // Parse LLM response (it comes wrapped in a \"text\" field)\n    if (filterItem.json.text) {\n      try {\n        filterResult = JSON.parse(filterItem.json.text);\n        console.log(`   [${index}] Parsed LLM response`);\n      } catch (parseError) {\n        console.log(`   [${index}] ❌ Failed to parse JSON:`, parseError.message);\n        return null;\n      }\n    } else if (filterItem.json.keep !== undefined) {\n      // Direct JSON (fallback)\n      filterResult = filterItem.json;\n      console.log(`   [${index}] Direct JSON response`);\n    } else {\n      console.log(`   [${index}] ❌ Invalid response format - no 'text' or 'keep' field`);\n      return null;\n    }\n    \n    // ✅ FIX: Get the original keyword from Extract Competitor Keywords node\n    // using index-based matching since LLM processes items in order\n    const originalKeyword = originalKeywords[index];\n    \n    if (!originalKeyword || !originalKeyword.json) {\n      console.log(`   [${index}] ❌ No original keyword found at this index`);\n      return null;\n    }\n    \n    const keyword = originalKeyword.json.keyword || '';\n    const competitorDomain = originalKeyword.json.competitor_domain || 'unknown';\n    \n    // Check if LLM decided to reject\n    if (filterResult.keep === false) {\n      console.log(`   [${index}] ❌ REJECTED: \"${keyword}\" (from ${competitorDomain})`);\n      console.log(`      Reason: ${filterResult.reason}`);\n      return null;\n    }\n    \n    console.log(`   [${index}] ✅ KEPT: \"${keyword}\" (from ${competitorDomain})`);\n    console.log(`      Reason: ${filterResult.reason}`);\n    \n    // Return the ORIGINAL keyword data with filter metadata\n    return {\n      json: {\n        // All original keyword fields\n        keyword: originalKeyword.json.keyword,\n        search_volume: originalKeyword.json.search_volume,\n        competition: originalKeyword.json.competition,\n        competition_level: originalKeyword.json.competition_level,\n        cpc: originalKeyword.json.cpc,\n        keyword_difficulty: originalKeyword.json.keyword_difficulty,\n        avg_backlinks: originalKeyword.json.avg_backlinks,\n        avg_rank: originalKeyword.json.avg_rank,\n        search_intent: originalKeyword.json.search_intent,\n        competitor_domain: originalKeyword.json.competitor_domain,\n        source: originalKeyword.json.source || 'competitor',\n        \n        // Target website info (for gap analysis)\n        target_business_type: originalKeyword.json.target_business_type,\n        target_services_offered: originalKeyword.json.target_services_offered,\n        target_business_description: originalKeyword.json.target_business_description,\n        \n        // Filter metadata\n        filter_reason: filterResult.reason || 'Kept by filter',\n        filter_decision: 'keep'\n      }\n    };\n  } catch (error) {\n    console.log(`   [${index}] ❌ Unexpected error:`, error.message);\n    console.log(`      Stack:`, error.stack);\n    return null;\n  }\n}).filter(item => item !== null);\n\nconsole.log('\\n3. ✅ Final keywords after filter:', results.length);\n\nif (results.length === 0) {\n  console.log('\\n⚠️ WARNING: ALL competitor keywords were filtered out!');\n  console.log('   This means NO competitor keywords will be in the final report.');\n  console.log('   Consider making the filter less strict or bypassing it.');\n}\n\nconsole.log('');\n\n// Return filtered results or empty array\nreturn results.length > 0 ? results : [];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7968,
+        3360
+      ],
+      "id": "dd793a99-fb38-40f6-9cd0-46202b786b33",
+      "name": "Apply Competitor Filter"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get Ranked Keywords": {
+      "main": [
+        [
+          {
+            "node": "Keywords",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Keywords for Each Competitor": {
+      "main": [
+        [
+          {
+            "node": "Keywords For Competitor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Competitors": {
+      "main": [
+        [
+          {
+            "node": "Competitors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Read Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Input": {
+      "main": [
+        [
+          {
+            "node": "Website Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Top 5–10 Competitors": {
+      "main": [
+        [
+          {
+            "node": "Get Keywords for Each Competitor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Competitor Keywords": {
+      "main": [
+        [
+          {
+            "node": "Filter Competitor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Target Keywords": {
+      "main": [
+        [
+          {
+            "node": "Filter Keywords",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Top Keywords for Competitors": {
+      "main": [
+        [
+          {
+            "node": "Get Competitors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gap Analysis": {
+      "main": [
+        [
+          {
+            "node": "Filter High Volume Keywords",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter High Volume Keywords": {
+      "main": [
+        [
+          {
+            "node": "Generate Report Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Gap Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Report Prompt": {
+      "main": [
+        [
+          {
+            "node": "Report Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report Generator": {
+      "main": [
+        [
+          {
+            "node": "Convert To Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "gpt": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Report Generator",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert To Markdown": {
+      "main": [
+        [
+          {
+            "node": "Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive": {
+      "main": [
+        [
+          {
+            "node": "Send Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error": {
+      "main": [
+        [
+          {
+            "node": "Send Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keywords": {
+      "main": [
+        [
+          {
+            "node": "Extract Target Keywords",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Extract Top Keywords for Competitors",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Competitors": {
+      "main": [
+        [
+          {
+            "node": "Pick Top 5–10 Competitors",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keywords For Competitor": {
+      "main": [
+        [
+          {
+            "node": "Extract Competitor Keywords",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Website Info": {
+      "main": [
+        [
+          {
+            "node": "Fetch Homepage HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Homepage HTML": {
+      "main": [
+        [
+          {
+            "node": "Extract Homepage Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Homepage Content": {
+      "main": [
+        [
+          {
+            "node": "Get Ranked Keywords",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Keywords": {
+      "main": [
+        [
+          {
+            "node": "Apply Keyword Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT 4.1 MINI": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Filter Keywords",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Keyword Filter": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Competitor": {
+      "main": [
+        [
+          {
+            "node": "Apply Competitor Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT 4.1 MINI1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Filter Competitor",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Competitor Filter": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e5c59c02-6600-4c5e-a175-8d0f9c94b621",
+  "meta": {
+    "instanceId": "151305d708accaf9ba7df3ae300984e7c14a108b131ed2d081a3bd48f670f5c4"
+  },
+  "id": "4pP271Smjq6gAUpY",
+  "tags": [
+    {
+      "updatedAt": "2025-11-18T10:45:47.993Z",
+      "createdAt": "2025-11-18T10:45:47.993Z",
+      "id": "TaYkrg3HODu8PBvS",
+      "name": "automation"
+    },
+    {
+      "updatedAt": "2026-01-19T04:54:05.599Z",
+      "createdAt": "2026-01-19T04:54:05.599Z",
+      "id": "mat6F3fQgi48RuSU",
+      "name": "SEO Report"
+    },
+    {
+      "updatedAt": "2026-02-10T11:17:12.034Z",
+      "createdAt": "2026-02-10T11:17:12.034Z",
+      "id": "tM9NaLzr3634pyn9",
+      "name": "competitiors"
+    },
+    {
+      "updatedAt": "2026-02-10T11:17:05.285Z",
+      "createdAt": "2026-02-10T11:17:05.285Z",
+      "id": "zvHpSCvd0L4rMPJv",
+      "name": "keywords"
+    }
+  ]
+}
